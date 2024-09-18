@@ -1,0 +1,8 @@
+# Autosave files
+*.asv
+
+# Output files
+out/*
+*.log
+
+*.pdf #assignment documentation
