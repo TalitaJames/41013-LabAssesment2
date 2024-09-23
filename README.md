@@ -30,11 +30,12 @@ The dishes are picked and sorted into the correct section of the cupboard by pas
 	- Light fence
 	- Estop
 	- Physical fence
-	- Plates (thin cylinders)
-	- Cups (thick cylinders)
+	- Plates, thin cylinders (250d 10h mm)
+	- Cups thick cylinders (60d 160w mm)
 
 ## General code structure
 
+```txt
 @GantryRobot/
 ├── GantryRobot.m
 └── link .ply files
@@ -42,5 +43,5 @@ Assets/
 └── other ply files
 out/
 └── *.log 
-
 SetupEnviroment.m
+```
