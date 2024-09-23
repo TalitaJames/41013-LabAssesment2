@@ -1,5 +1,10 @@
 # 41013 Lab Assesment 2
 
+## Libraries and Packages Needed
+To run, the user must have these packages:
+- [`rvctoolbox` by Peter Corke, UTS v7](https://github.com/petercorke/robotics-toolbox-matlab)
+- [`log4matlab` by Gavin Paul](https://au.mathworks.com/matlabcentral/fileexchange/33532-log4matlab)
+
 ## Task Notes
 wants your group to spend a few weeks investigating the application of a robot, including integrated safety.
 SafeCo has made available several real desktop robot manipulators (including their models)
