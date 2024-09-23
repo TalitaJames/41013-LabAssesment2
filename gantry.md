@@ -1,1 +1,0 @@
-The second robot is a gantry, with 3 linear degrees of freedom provided by prismatic joints and a spherical joint on the end to give it freedom in handling the dishes. Its workspace is a rectangular parallelepiped, that covers the cupboard area and has intersection with the UR3e's workspace outside of the cupboard.
