@@ -47,7 +47,7 @@ The second robot is a gantry, with 3 linear degrees of freedom provided by prism
 @GantryRobot/
 ├── GantryRobot.m
 └── link .ply files
-Assets/
+graphical_models/
 └── other ply files
 out/
 └── *.log 

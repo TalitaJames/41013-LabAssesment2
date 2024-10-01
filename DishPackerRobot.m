@@ -4,18 +4,33 @@ classdef DishPackerRobot < handle
     end
 
     properties (SetAccess = private) % private variables
-        UR3e
-        gantry
+        robot_UR3e
+        robot_gantry
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
 
         % All enviroment handles
-
+        envroment_h;
         
     end
 
     methods (Access = private)
         function SetupEnviroment(self)
         % Create the enviroment, setup robots, place plates ect
+
+            % Place the robots
+            self.robot_UR3e = UR3e;
+
+
+            % move the robot to inital position of on the table at "home"
+            self.robot_UR3e.model.base = transl(0,0,0) * self.robot_UR3e.model.base.T;
+            self.robot_UR3e.model.animate(self.robot_UR3e.homeQ);
+
+            % Create the enviroment
+            plate_h = PlaceObject("graphical_models/plate_mm.ply",[1.5,1,0]);
+            HandleManipulation.ScaleHandle(plate_h, 0.01);
+            %self.envroment_h = PlaceObject("graphical_models/glass.ply",[1.5,0.6,0]);
+            %HelperFunctions.RotateHandle(self.personTwo_h,trotz(pi/2))
+
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), "The enviroment has been created"};
         end
     end
