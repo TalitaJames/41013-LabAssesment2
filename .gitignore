@@ -1,5 +1,6 @@
 # Autosave files
 *.asv
+*.blend1
 
 # Output files
 out/*
