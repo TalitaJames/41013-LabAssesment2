@@ -54,14 +54,11 @@ classdef DishPackerRobot < handle
             obj.SetupEnviroment();
         end
 
-        function AnimateRobot(self, robot, endEffectorPose, steps)
-        % Animates given robot from its current position to end
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    "Animating a robot"};
+        function [isValid, endEffectorJoints] = canReachPose(self, robot, endEffectorPose)
+            isValid = false;
 
             currentJoints = robot.model.getpos;
             currentEndEffectorPose = robot.model.fkine(currentJoints).T;
-
 
             % check if the robot is already there
             distanceToPoint = DistanceHelpers.DistanceOfTwoSE3Points(currentEndEffectorPose, endEffectorPose);
@@ -86,7 +83,20 @@ classdef DishPackerRobot < handle
                 return;
             end
 
+            isValid = true;
+        end
 
+        function AnimateRobot(self, robot, endEffectorPose, steps)
+        % Animates given robot from its current position to end
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Animating a robot"};
+
+            [poseReachable, endEffectorJoints] = self.canReachPose(robot,endEffectorPose);
+            if (not(poseReachable))
+                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                    "Position Invalid"};
+                return;
+            end
 
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
