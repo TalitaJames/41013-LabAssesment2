@@ -98,6 +98,7 @@ classdef DishPackerRobot < handle
                 return;
             end
 
+            currentJoints = robot.model.getpos;
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
                 "to",self.logger.MatrixToString(endEffectorJoints)]};
@@ -131,7 +132,7 @@ classdef DishPackerRobot < handle
         function Reset(self)
         % Resets the whole system to its "home" positions
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
-            self.AnimateRobot(homePose,40);
+            self.AnimateRobot(self.robot_UR3e, homePose,40);
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Reset system"};
         end
