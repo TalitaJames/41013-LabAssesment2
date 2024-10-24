@@ -8,12 +8,19 @@ classdef DishPackerRobot < handle
         robot_gantry
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
 
+        eStopListener
+
         % All enviroment handles
         enviroment_h;
         floor_h
         table_h;
         eStopFace_h;
     end
+
+    events
+        eStopEvent
+    end
+
 
     methods (Access = private)
         function SetupEnviroment(self)
@@ -52,6 +59,7 @@ classdef DishPackerRobot < handle
         function obj = DishPackerRobot()
         % Construct a DishPacker Object
             obj.SetupEnviroment();
+            obj.eStopListener = addlistener(obj,'eStopEvent',@EStop);
         end
 
         function AnimateRobot(self, robot, endEffectorPose, steps)
@@ -133,7 +141,13 @@ classdef DishPackerRobot < handle
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Teaching pannel is now visable"};
         end
-        
+
+        function EStop(self, event)
+            disp("Estop Pressed!")
+            self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                "EStop Pressed!"};
+        end
+
         function Chaos(self, e)
             self.AnimateRobot(self.robot_UR3e, e, 50);
         end
