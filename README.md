@@ -1,9 +1,13 @@
 # 41013 Lab Assesment 2
 
-## Libraries and Packages Needed
+## Libraries, and asset credit
 To run, the user must have these packages:
 - [`rvctoolbox` by Peter Corke, UTS v7](https://github.com/petercorke/robotics-toolbox-matlab)
 - [`log4matlab` by Gavin Paul](https://au.mathworks.com/matlabcentral/fileexchange/33532-log4matlab)
+
+Assets used
+- [Kitchen Tile Texture](https://seamless-pixels.blogspot.com/2012/09/free-seamless-floor-tile-textures.html)
+
 
 ## Task Notes
 wants your group to spend a few weeks investigating the application of a robot, including integrated safety.
