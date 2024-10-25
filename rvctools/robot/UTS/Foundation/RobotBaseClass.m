@@ -16,7 +16,7 @@ classdef RobotBaseClass < handle
         name;
 
         %> workspace (this changes based on the DH parameters)  
-        workspace = [-10 10 -10 10 -0.01 10];
+        workspace = [-5 5 -5 5 -0.01 5]; %FIXME used to be 10
 
         %> The home location in radians 
         homeQ = [];
@@ -197,8 +197,11 @@ classdef RobotBaseClass < handle
             % Display robot
             [ax,by] = view;
             
-            roughMinMax = sum(abs(self.model.d) + abs(self.model.a));
-            self.workspace = [-roughMinMax roughMinMax -roughMinMax roughMinMax -0.01 roughMinMax]; 
+            
+            if(any(self.model.d) && any(self.model.a))
+		        roughMinMax = sum(abs(self.model.d) + abs(self.model.a));
+		        self.workspace = [-roughMinMax roughMinMax -roughMinMax roughMinMax -0.01 roughMinMax]; 
+            end
 
             self.model.plot3d(self.homeQ,'noarrow','workspace',self.workspace,'view',[ax,by]);%,'notiles');            
 
