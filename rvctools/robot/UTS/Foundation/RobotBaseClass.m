@@ -16,7 +16,7 @@ classdef RobotBaseClass < handle
         name;
 
         %> workspace (this changes based on the DH parameters)  
-        workspace = [-5 5 -5 5 -0.01 5]; %FIXME used to be 10
+        workspace = [-3 3 -3 3 -0.01 3]; %FIXME used to be 10
 
         %> The home location in radians 
         homeQ = [];

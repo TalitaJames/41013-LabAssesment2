@@ -18,44 +18,40 @@ classdef DishPackerRobot < handle
         % All enviroment handles
         enviroment_h;
         floor_h
-        table_h;
-        eStopFace_h;
     end
 
     methods (Access = private)
         function SetupEnviroment(self)
-        % Create the enviroment, setup robots, place plates ect
-            hold on;
+        % Create the enviroment, setup robots, place plates and other ply files
+            hold on; % Put all the objects on the same plot
             %axis equal;
-            view(3);
+            view(3); %3D Perspective
 
             % Place the robots
-            self.robot_UR3e = UR3e(transl(1.7, 0.8, 0.7));
-            self.robot_gantry = Gantry(transl(1, 1, 0.7));
+            self.robot_UR3e = UR3e(transl(-0.1, -0.2, 0.7));
+            self.robot_gantry = Gantry(transl(-1, -0.6, 0.7));
 
             % Create the enviroment
-            self.enviroment_h = PlaceObject("graphical_models/environment.ply",[1.75,1,0]);
-            
-            
-            % Place the plates
-            plateCount = 3;
+            self.enviroment_h = PlaceObject("graphical_models/environment.ply",[0,0,0]);
 
-            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(1.5, 1, 0.7), 15/1000, plateCount);
+            % Place the plates
+            plateCount = 3; % How many plates to stack
+
+            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(-0.25, 0, 0.7), 
+                                    15/1000, plateCount); % Generate [[x1,y1,z1], ... [xn,yn,zn]] start positions
             self.plate_h = PlaceObject(self.PLATE_FILEPATH,self.plate_startXYZ);
             self.plate_currentXYZ = self.plate_startXYZ;
-            finalPlate = [1.5,0.5,1.2];
-            self.plate_endXYZ = repmat(finalPlate, plateCount,1);
+
+            finalPlate = [1.5,0.5,1.2]; % where are the plates expexted to go
+            self.plate_endXYZ = repmat(finalPlate, plateCount,1); %ie cupboard positions
 
 
-            % HelperFunctions.Rotate(self.personTwo_h,trotz(pi/2))
 
            self.floor_h = surf([-1,-1; 3,3]... % X
                 ,[-2, 3;-2,3] ... % Y
                 ,[ 0.0, 0.0; 0.0,0.0] ... % Z
                 ,'CData',imread('graphical_models/floor-texture.png') ...
-                ,'FaceColor','texturemap');
-            %self.eStopFace_h = PlaceObject("rvctools/robot/UTS/Parts/emergencyStopButton.ply",[0.9,-0.55,0.5-0.15]);
-            %self.eStopFace_h = PlaceObject("rvctools/robot/UTS/Parts/tableBrown2.1x1.4x0.5m.ply",[0.9,-0.55,0.5-0.15]);
+                ,'FaceColor','texturemap'); % Make the floor cocer that x,y,z plane, with that image
 
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), "The enviroment has been created"};
         end
