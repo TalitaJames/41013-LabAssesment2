@@ -49,7 +49,13 @@ classdef HandleManipulation
             set(handle, 'Vertices', recenteredVertices);
         end
 
-        function [positions] = HandlePositions(handle)
+        function AbsoluteRotation(handle, transformation)
+            % Set the rotation of handle (.ply) to some "transformation"
+            warning("Calls Rotate and not absolute");
+            HandleManipulation.Rotate(handle, transformation);
+        end
+
+        function [positions] = GetPositions(handle)
             % returns an array [minX, minY, minZ; maxX, maxY, maxZ] of
             % the given handle dimensions
             vertices = get(handle,'Vertices');

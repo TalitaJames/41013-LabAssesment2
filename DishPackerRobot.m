@@ -40,11 +40,15 @@ classdef DishPackerRobot < handle
             
             
             % Place the plates
-            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(1.7,1.1,0.7), 15/1000, 5);
+            plateCount = 3;
+
+            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(1.5, 1, 0.7), 15/1000, plateCount);
             self.plate_h = PlaceObject(self.PLATE_FILEPATH,self.plate_startXYZ);
-            self.plate_original_h = self.plate_h;
-            % HandleManipulation.Scale(plate_h, 0.01);
-            % self.envroment_h = PlaceObject("graphical_models/glass.ply",[1.5,0.6,0]);
+            self.plate_currentXYZ = self.plate_startXYZ;
+            finalPlate = [1.5,0.5,1.2];
+            self.plate_endXYZ = repmat(finalPlate, plateCount,1);
+
+
             % HelperFunctions.Rotate(self.personTwo_h,trotz(pi/2))
 
            self.floor_h = surf([-1,-1; 3,3]... % X
@@ -65,7 +69,7 @@ classdef DishPackerRobot < handle
             obj.SetupEnviroment();
         end
 
-        function [isValid, endEffectorJoints] = canReachPose(self, robot, endEffectorPose)
+        function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
         % Checks if a given robot can go to a given pose
             isValid = false;
             endEffectorJoints = 0; % if already there, data is required in return vars
@@ -104,7 +108,7 @@ classdef DishPackerRobot < handle
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                     "Animating a robot"};
 
-            [poseReachable, endEffectorJoints] = self.canReachPose(robot,endEffectorPose);
+            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
             if (not(poseReachable))
                 self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
                     "Position Invalid"};
@@ -139,7 +143,7 @@ classdef DishPackerRobot < handle
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                     "Animating a robot with object"};
 
-            [poseReachable, endEffectorJoints] = self.canReachPose(robot,endEffectorPose);
+            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
             if (not(poseReachable))
                 self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
                     "Position Invalid"};
@@ -168,7 +172,7 @@ classdef DishPackerRobot < handle
 
                 HandleManipulation.Move(handle,currentEndEffector);
                 %BUG: this needs to rotate absolutly not incrementaly
-                HandleManipulation.AbsoluteRotation(handle, currentEndEffector);
+                %HandleManipulation.AbsoluteRotation(handle, currentEndEffector);
                 drawnow();
             end
 
@@ -177,21 +181,39 @@ classdef DishPackerRobot < handle
 
         end
 
-        function MovePlate(self, startPos, endPos)
+        function MovePlate(self, plateID)
         % Takes a plate from the start to its expected position using both robots
+            steps = 50;
+            plateCurrentPose = transl(self.plate_currentXYZ(plateID,:));
+            plateHandoverPose = transl(1.45, 0.6, 1.2); % some position both robots can reach to exchange plate
+
+            self.AnimateRobot(self.robot_UR3e, plateCurrentPose, steps);
+            self.AnimateRobotWithObj(self.robot_UR3e, plateHandoverPose, ...
+                steps, self.plate_h(plateID));
+            % bring gantry to shared location
+            % Animate the gantry to put away the plate
+            % current plate location is now at end
         end
 
         function Reset(self)
         % Resets the whole system to its "home" positions
+
+             % place the plates back
+            try delete(self.plate_h);end %#ok<TRYNC>
+            self.plate_currentXYZ = self.plate_startXYZ;
+            self.plate_h = PlaceObject(self.PLATE_FILEPATH, self.plate_currentXYZ);
+
+            % Robots go home
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
-            self.AnimateRobot(self.robot_UR3e, homePose,40);
+            self.AnimateRobot(self.robot_UR3e, homePose, 15);
+
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Reset system"};
         end
 
         function Teach(self)
         % Brings up the "teach" pane for each robot
-            % self.Reset()
+            self.Reset()
             self.robot_UR3e.model.teach(self.robot_UR3e.homeQ);
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Teaching pannel is now visable"};
