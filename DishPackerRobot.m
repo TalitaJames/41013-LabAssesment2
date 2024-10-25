@@ -1,4 +1,5 @@
 classdef DishPackerRobot < handle
+
     properties (Constant)
         PLATE_FILEPATH = "graphical_models/plate.ply"
     end

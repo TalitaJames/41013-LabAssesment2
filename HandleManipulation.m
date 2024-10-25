@@ -1,4 +1,7 @@
 classdef HandleManipulation
+    % A collection of static methods to manipulate a handle
+    % (primarily plotted .ply) files.
+    % It involves moving and getting info from them
 
     methods(Static)
 
