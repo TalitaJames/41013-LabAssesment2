@@ -2,7 +2,7 @@ classdef HandleManipulation
 
     methods(Static)
 
-           function TranslateHandle(handle, transformation)
+           function Translate(handle, transformation)
             % Move handle (.ply) by an adjustment factor "transformation"
 
             vertices = get(handle,'Vertices');
@@ -11,18 +11,18 @@ classdef HandleManipulation
             set(handle,'Vertices',translatedVertices);
         end
 
-        function MoveHandle(handle, transformation)
+        function Move(handle, transformation)
             % Move handle (.ply) to a new position "transformation"
 
             vertices = get(handle,'Vertices');
             currentCenter = mean(vertices);
             newCenter = transpose(transformation(1:3,4));
             translation = newCenter - currentCenter;
-            HandleManipulation.TranslateHandle(handle, transl(translation));
+            HandleManipulation.Translate(handle, transl(translation));
 
         end
 
-        function ScaleHandle(handle, scale)
+        function Scale(handle, scale)
             % Uniformly resize handle (.ply) by some "scale" value
             vertices = get(handle,'Vertices');
             scaledVertices = vertices * scale;
@@ -33,7 +33,7 @@ classdef HandleManipulation
             HandleManipulation.MoveHandle(handle, transl(currentCenter));
         end
 
-        function RotateHandle(handle, transformation)
+        function Rotate(handle, transformation)
             % Rotate handle (.ply) by some "transformation" value
         
             vertices = get(handle, 'Vertices');

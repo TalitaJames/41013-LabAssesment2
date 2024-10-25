@@ -1,6 +1,6 @@
 classdef DishPackerRobot < handle
     properties (Constant)
-      
+        PLATE_FILEPATH = "graphical_models/plate.ply"
     end
 
     properties (SetAccess = private) % private variables
@@ -8,10 +8,15 @@ classdef DishPackerRobot < handle
         robot_gantry
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
 
+        % Plate data
+        plate_h
+        plate_startXYZ
+        plate_currentXYZ
+        plate_endXYZ
+
         % All enviroment handles
         enviroment_h;
         floor_h
-        plate_h
         table_h;
         eStopFace_h;
     end
@@ -32,10 +37,15 @@ classdef DishPackerRobot < handle
 
             % Create the enviroment
             self.enviroment_h = PlaceObject("graphical_models/environment.ply",[1.75,1,0]);
-            self.plate_h = PlaceObject("graphical_models/plate.ply",[1.5,1,0.7]);
-            % HandleManipulation.ScaleHandle(plate_h, 0.01);
+            
+            
+            % Place the plates
+            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(1.7,1.1,0.7), 15/1000, 5);
+            self.plate_h = PlaceObject(self.PLATE_FILEPATH,self.plate_startXYZ);
+            self.plate_original_h = self.plate_h;
+            % HandleManipulation.Scale(plate_h, 0.01);
             % self.envroment_h = PlaceObject("graphical_models/glass.ply",[1.5,0.6,0]);
-            % HelperFunctions.RotateHandle(self.personTwo_h,trotz(pi/2))
+            % HelperFunctions.Rotate(self.personTwo_h,trotz(pi/2))
 
            self.floor_h = surf([-1,-1; 3,3]... % X
                 ,[-2, 3;-2,3] ... % Y
@@ -56,6 +66,7 @@ classdef DishPackerRobot < handle
         end
 
         function [isValid, endEffectorJoints] = canReachPose(self, robot, endEffectorPose)
+        % Checks if a given robot can go to a given pose
             isValid = false;
             endEffectorJoints = 0; % if already there, data is required in return vars
 
@@ -154,7 +165,10 @@ classdef DishPackerRobot < handle
 
                 robot.model.animate(q);
                 currentEndEffector = robot.model.fkine(q).T;
-                HandleManipulation.MoveHandle(handle,currentEndEffector);
+
+                HandleManipulation.Move(handle,currentEndEffector);
+                %BUG: this needs to rotate absolutly not incrementaly
+                HandleManipulation.AbsoluteRotation(handle, currentEndEffector);
                 drawnow();
             end
 
@@ -193,5 +207,19 @@ classdef DishPackerRobot < handle
                 "Deleting object"};
         end
 
+    end
+
+    methods (Static)
+        function [platePositions] = GeneratePlatePositions(startPos, height, count)
+        % work out the starting center of each (count) plates
+
+            platePositions = zeros(count,3);
+            startXYZ = startPos(1:3, 4);  % The translation part
+            for i = 1:count
+                platePositions(i,:) = [startXYZ(1),startXYZ(2),(startXYZ(3)+height*(i-1))];
+            end
+
+            platePositions = flip(platePositions); % make them stack top to bottom
+        end
     end
 end
