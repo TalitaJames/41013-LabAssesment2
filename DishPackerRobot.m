@@ -30,11 +30,8 @@ classdef DishPackerRobot < handle
             view(3);
 
             % Place the robots
-            self.robot_UR3e = UR3e;
-
-            % move the robot to inital position of on the table at "home"
-            self.robot_UR3e.model.base = transl(1.7,0.8,0.7) * self.robot_UR3e.model.base.T;
-            self.robot_UR3e.model.animate(self.robot_UR3e.homeQ);
+            self.robot_UR3e = UR3e(transl(1.7, 0.8, 0.7));
+            self.robot_gantry = Gantry(transl(1, 1, 0.7));
 
             % Create the enviroment
             self.enviroment_h = PlaceObject("graphical_models/environment.ply",[1.75,1,0]);
