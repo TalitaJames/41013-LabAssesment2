@@ -11,6 +11,7 @@ classdef DishPackerRobot < handle
         % All enviroment handles
         enviroment_h;
         floor_h
+        plate_h
         table_h;
         eStopFace_h;
     end
@@ -31,7 +32,7 @@ classdef DishPackerRobot < handle
 
             % Create the enviroment
             self.enviroment_h = PlaceObject("graphical_models/environment.ply",[1.75,1,0]);
-            % plate_h = PlaceObject("graphical_models/plate.ply",[1.5,1,0]);
+            self.plate_h = PlaceObject("graphical_models/plate.ply",[1.5,1,0.7]);
             % HandleManipulation.ScaleHandle(plate_h, 0.01);
             % self.envroment_h = PlaceObject("graphical_models/glass.ply",[1.5,0.6,0]);
             % HelperFunctions.RotateHandle(self.personTwo_h,trotz(pi/2))
@@ -56,6 +57,7 @@ classdef DishPackerRobot < handle
 
         function [isValid, endEffectorJoints] = canReachPose(self, robot, endEffectorPose)
             isValid = false;
+            endEffectorJoints = 0; % if already there, data is required in return vars
 
             currentJoints = robot.model.getpos;
             currentEndEffectorPose = robot.model.fkine(currentJoints).T;
@@ -122,6 +124,42 @@ classdef DishPackerRobot < handle
         function AnimateRobotWithObj(self, robot, endEffectorPose, steps, handle)
         % Animates given robot from its current position to end, bringing a
         % handle at the position of the end efector
+
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Animating a robot with object"};
+
+            [poseReachable, endEffectorJoints] = self.canReachPose(robot,endEffectorPose);
+            if (not(poseReachable))
+                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                    "Position Invalid"};
+                return;
+            end
+
+            currentJoints = robot.model.getpos;
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                ["Starting Robot & Obj animation from", self.logger.MatrixToString(currentJoints),...
+                "to",self.logger.MatrixToString(endEffectorJoints)]};
+
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
+                "to",self.logger.MatrixToString(endEffectorJoints)]};
+
+            robotTraj = jtraj(currentJoints,endEffectorJoints,steps);
+
+            for i = 1:steps
+                q = robotTraj(i,:);
+
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    ["Moving robot to joint pos", self.logger.MatrixToString(q)]};
+
+                robot.model.animate(q);
+                currentEndEffector = robot.model.fkine(q).T;
+                HandleManipulation.MoveHandle(handle,currentEndEffector);
+                drawnow();
+            end
+
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                "Animation Done"};
 
         end
 
