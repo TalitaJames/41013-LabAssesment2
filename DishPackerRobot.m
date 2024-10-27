@@ -49,7 +49,7 @@ classdef DishPackerRobot < handle
             self.floor_h = surf([-1,-1; 3,3]... % X
                 ,[-2, 3;-2,3] ... % Y
                 ,[ 0.0, 0.0; 0.0,0.0] ... % Z
-                ,'CData',imread(self.GRAPHIC_FILEPATH+"floor.png") ...
+                ,'CData',imread(self.GRAPHIC_FILEPATH+"floor-texture.png") ...
                 ,'FaceColor','texturemap'); % Make the floor cocer that x,y,z plane, with that image
 
             self.Reset() % Finalises plate placement, colouring
