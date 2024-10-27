@@ -66,5 +66,21 @@ classdef HandleManipulation
             positions = [min(vertices)
                          max(vertices)];
         end
+
+        function SetColour(handle, RGB)
+            % SetColour changes the color of a 3D object (.ply)
+            % RGB: 1x3 array specifying the desired color as [R G B], values from 0 to 1
+        
+            % Ensure RGB is in the range [0, 1] if provided as [0, 255]
+            if max(RGB) > 1
+                RGB = RGB / 255;
+            end
+
+            % Set the color for each face
+            faces = get(handle, 'Faces');
+            faceColors = repmat(RGB, size(faces, 1), 1); % repeat the matrix per face
+            set(handle, 'FaceVertexCData', faceColors, 'FaceColor', 'flat');
+        end
+
     end
 end

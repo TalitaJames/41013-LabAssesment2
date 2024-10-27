@@ -1,7 +1,7 @@
 classdef DishPackerRobot < handle
 
     properties (Constant)
-        PLATE_FILEPATH = "graphical_models/plate.ply"
+        GRAPHIC_FILEPATH = "graphical_models/";
     end
 
     properties (SetAccess = private) % private variables
@@ -32,27 +32,27 @@ classdef DishPackerRobot < handle
             self.robot_gantry = Gantry(transl(-1, -0.6, 0.7));
 
             % Create the enviroment
-            self.enviroment_h = PlaceObject("graphical_models/environment.ply",[0,0,0]);
+            self.enviroment_h = PlaceObject(self.GRAPHIC_FILEPATH+"environment.ply",[0,0,0]);
 
             % Place the plates
             plateCount = 3; % How many plates to stack
-
-            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(-0.25, 0, 0.7), 
+            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(-0.25, 0, 0.7), ...
                                     15/1000, plateCount); % Generate [[x1,y1,z1], ... [xn,yn,zn]] start positions
-            self.plate_h = PlaceObject(self.PLATE_FILEPATH,self.plate_startXYZ);
-            self.plate_currentXYZ = self.plate_startXYZ;
 
+            % TODO this should have an intermediete transition between two
+            % points then the final points (all unique not same pos)
             finalPlate = [1.5,0.5,1.2]; % where are the plates expexted to go
             self.plate_endXYZ = repmat(finalPlate, plateCount,1); %ie cupboard positions
 
 
 
-           self.floor_h = surf([-1,-1; 3,3]... % X
+            self.floor_h = surf([-1,-1; 3,3]... % X
                 ,[-2, 3;-2,3] ... % Y
                 ,[ 0.0, 0.0; 0.0,0.0] ... % Z
-                ,'CData',imread('graphical_models/floor-texture.png') ...
+                ,'CData',imread(self.GRAPHIC_FILEPATH+"floor.png") ...
                 ,'FaceColor','texturemap'); % Make the floor cocer that x,y,z plane, with that image
 
+            self.Reset() % Finalises plate placement, colouring
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), "The enviroment has been created"};
         end
     end
@@ -195,7 +195,10 @@ classdef DishPackerRobot < handle
              % place the plates back
             try delete(self.plate_h);end %#ok<TRYNC>
             self.plate_currentXYZ = self.plate_startXYZ;
-            self.plate_h = PlaceObject(self.PLATE_FILEPATH, self.plate_currentXYZ);
+            self.plate_h = PlaceObject(self.GRAPHIC_FILEPATH+"plate.ply", self.plate_currentXYZ);
+            for i = 1:length(self.plate_h) % Colour all plates orange
+                HandleManipulation.SetColour(self.plate_h(i), [255, 184, 77])
+            end
 
             % Robots go home
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
