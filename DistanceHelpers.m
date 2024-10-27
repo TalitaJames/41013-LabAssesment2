@@ -15,7 +15,7 @@ classdef DistanceHelpers
             qA = rotm2quat(A(1:3, 1:3));
             qB = rotm2quat(B(1:3, 1:3));
 
-            angle = qA.dist(qB);
+            angle = qA.dist(qB); % [rad]
         end
     end
 end

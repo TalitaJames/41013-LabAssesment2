@@ -73,12 +73,13 @@ classdef DishPackerRobot < handle
 
             % check if the robot is already there
             distanceToPoint = DistanceHelpers.DistanceOfTwoSE3Points(currentEndEffectorPose, endEffectorPose);
-            linearThreshold = 0.005;
-            angularThreshold = 0.1;
+            linearThreshold = 0.01; % [m]
+            angularThreshold = 0.1; % [rad]
             isAtPosition = distanceToPoint <= linearThreshold;
-            if mask ~= [1 1 1 0 0 0]
+            if (mask ~= [1 1 1 0 0 0]) % if the mask isn't just XYZ, consider angle
                 isAtPosition = isAtPosition && DistanceHelpers.AngularDistance(currentEndEffectorPose, endEffectorPose) <= angularThreshold; 
             end
+
             if(isAtPosition)
                  self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                     ["Robot is already there, ", distanceToPoint, "m away"]};
