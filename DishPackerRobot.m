@@ -13,6 +13,7 @@ classdef DishPackerRobot < handle
         plate_h
         plate_startXYZ
         plate_currentXYZ
+        plate_handoverXYZ
         plate_endXYZ
 
         % All enviroment handles
@@ -41,7 +42,8 @@ classdef DishPackerRobot < handle
 
             % TODO this should have an intermediete transition between two
             % points then the final points (all unique not same pos)
-            finalPlate = [1.5,0.5,1.2]; % where are the plates expexted to go
+            self.plate_handoverXYZ = transl(-0.314,-0.423,1.1);
+            finalPlate = [-0.314,-0.423,1.1]; % where are the plates expexted to go
             self.plate_endXYZ = repmat(finalPlate, plateCount,1); %ie cupboard positions
 
 
@@ -179,10 +181,9 @@ classdef DishPackerRobot < handle
         % Takes a plate from the start to its expected position using both robots
             steps = 50;
             plateCurrentPose = transl(self.plate_currentXYZ(plateID,:));
-            plateHandoverPose = transl(1.45, 0.6, 1.2); % some position both robots can reach to exchange plate
 
             self.AnimateRobot(self.robot_UR3e, plateCurrentPose, steps);
-            self.AnimateRobotWithObj(self.robot_UR3e, plateHandoverPose, ...
+            self.AnimateRobotWithObj(self.robot_UR3e, self.plate_handoverXYZ, ...
                 steps, self.plate_h(plateID));
             % bring gantry to shared location
             % Animate the gantry to put away the plate
@@ -202,7 +203,7 @@ classdef DishPackerRobot < handle
 
             % Robots go home
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
-            self.AnimateRobot(self.robot_UR3e, homePose, 15);
+            self.AnimateRobot(self.robot_UR3e, homePose, 5);
 
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Reset system"};
