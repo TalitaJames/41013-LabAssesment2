@@ -7,7 +7,10 @@ classdef DishPackerRobot < handle
     properties (SetAccess = private) % private variables
         robot_UR3e
         robot_gantry
-        logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
+
+        % Logger commented out purely for me, maybe a windows issue
+        %logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
+        logger = log4matlab("TempLog.log"); %#ok<TNOW1,*DATST>
 
         % Plate data
         plate_h
@@ -19,6 +22,10 @@ classdef DishPackerRobot < handle
         % All enviroment handles
         enviroment_h;
         floor_h
+        barrier1_h
+        barrier2_h
+        WarningLight_h
+
     end
 
     methods (Access = private)
@@ -34,6 +41,24 @@ classdef DishPackerRobot < handle
 
             % Create the enviroment
             self.enviroment_h = PlaceObject(self.GRAPHIC_FILEPATH+"environment.ply",[0,0,0]);
+
+            % Create the safety barriers
+            self.barrier1_h = PlaceObject("rvctools/robot/UTS/Parts/barrier1.5x0.2x1m.ply",[-1,-0.45,0]);
+            self.barrier2_h = PlaceObject("rvctools/robot/UTS/Parts/barrier1.5x0.2x1m.ply",[-1.7,0.2,0]);
+            rotate(self.barrier2_h,[0 0 1],90,[-1.7 0.2 0]);
+
+            % Create the light
+            self.WarningLight_h = PlaceObject("graphical_models/alarm.ply",[-1.9,0.3,0.8]);
+
+            %HandleManipulation.Scale(self.WarningLight_h,0.001);
+            
+            %The Scale function seems to not be fully completed so this is
+            %temp code to do the same thing
+            % (to be replaced by the above code)
+            vertices = get(self.WarningLight_h,'Vertices');
+            scaledVertices = vertices * 0.001;
+            set(self.WarningLight_h,'Vertices',scaledVertices);
+
 
             % Place the plates
             %plateCount = 7; % How many plates to stack
@@ -58,12 +83,35 @@ classdef DishPackerRobot < handle
             self.Reset() % Finalises plate placement, colouring
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), "The enviroment has been created"};
         end
+        
+        function SensorCheck()
+        %Checks if something has passed the sensor
+            %etc
+            %mainly for simulated integration but needs to exist for arduino too
+        end
+
+        function StopMovement()
+        % Should store current function for resume capabilities, and stop
+        % all movement until ButtonPress() clears
+        % and should flash light
+            ButtonCheck = parfeval(backgroundPool,@ButtonPress,1);
+            ButtonValue = fetchOutputs(ButtonCheck);
+            %etc
+
+            %Flash = light("Style","Local","Position",[-1.9 0.3 0.8],"Color",[1 0 0]);
+        end
+
+        function ButtonPress()
+            %Etc
+        end
     end
 
     methods (Access = public)
         function obj = DishPackerRobot()
         % Construct a DishPacker Object
             obj.SetupEnviroment(7);
+            SafetyCheck = parfeval(backgroundPool,@obj.SensorCheck,1);
+            %SensorValue = fetchOutputs(SafetyCheck);
         end
 
         function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
