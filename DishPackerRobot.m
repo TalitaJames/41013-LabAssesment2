@@ -1,6 +1,7 @@
 classdef DishPackerRobot < handle
+
     properties (Constant)
-      
+        GRAPHIC_FILEPATH = "graphical_models/";
     end
 
     properties (SetAccess = private) % private variables
@@ -9,12 +10,17 @@ classdef DishPackerRobot < handle
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
 
         eStopListener
+        
+        % Plate data
+        plate_h
+        plate_startXYZ
+        plate_currentPose
+        plate_handoverXYZ
+        plate_endXYZ
 
         % All enviroment handles
         enviroment_h;
         floor_h
-        table_h;
-        eStopFace_h;
     end
 
     events
@@ -23,34 +29,40 @@ classdef DishPackerRobot < handle
 
 
     methods (Access = private)
-        function SetupEnviroment(self)
-        % Create the enviroment, setup robots, place plates ect
-            hold on;
+        function SetupEnviroment(self, plateCount)
+        % Create the enviroment, setup robots, place plates and other ply files
+            hold on; % Put all the objects on the same plot
             %axis equal;
-            view(3);
+            view(3); %3D Perspective
 
             % Place the robots
-            self.robot_UR3e = UR3e;
-
-            % move the robot to inital position of on the table at "home"
-            self.robot_UR3e.model.base = transl(1.7,0.8,0.7) * self.robot_UR3e.model.base.T;
-            self.robot_UR3e.model.animate(self.robot_UR3e.homeQ);
+            self.robot_UR3e = UR3e(transl(-0.1, -0.2, 0.7));
+            self.robot_gantry = Gantry(transl(-1, -0.6, 0.7));
 
             % Create the enviroment
-            self.enviroment_h = PlaceObject("graphical_models/environment.ply",[1.75,1,0]);
-            % plate_h = PlaceObject("graphical_models/plate.ply",[1.5,1,0]);
-            % HandleManipulation.ScaleHandle(plate_h, 0.01);
-            % self.envroment_h = PlaceObject("graphical_models/glass.ply",[1.5,0.6,0]);
-            % HelperFunctions.RotateHandle(self.personTwo_h,trotz(pi/2))
+            self.enviroment_h = PlaceObject(self.GRAPHIC_FILEPATH+"environment.ply",[0,0,0]);
 
-           self.floor_h = surf([-1,-1; 3,3]... % X
+            % Place the plates
+            %plateCount = 7; % How many plates to stack
+            self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(-0.25, 0, 0.7), ...
+                                    15/1000, plateCount); % Generate [[x1,y1,z1], ... [xn,yn,zn]] start positions
+            self.plate_currentPose = zeros(4,4,plateCount); % This is initialised here, set in Reset()
+
+            % TODO this should have an intermediete transition between two
+            % points then the final points (all unique not same pos)
+            self.plate_handoverXYZ = transl(-0.314,-0.423,1.1);
+            finalPlate = [-0.314,-0.423,1.1]; % where are the plates expexted to go
+            self.plate_endXYZ = repmat(finalPlate, plateCount,1); %ie cupboard positions
+
+
+
+            self.floor_h = surf([-1,-1; 3,3]... % X
                 ,[-2, 3;-2,3] ... % Y
                 ,[ 0.0, 0.0; 0.0,0.0] ... % Z
-                ,'CData',imread('graphical_models/floor-texture.png') ...
-                ,'FaceColor','texturemap');
-            %self.eStopFace_h = PlaceObject("rvctools/robot/UTS/Parts/emergencyStopButton.ply",[0.9,-0.55,0.5-0.15]);
-            %self.eStopFace_h = PlaceObject("rvctools/robot/UTS/Parts/tableBrown2.1x1.4x0.5m.ply",[0.9,-0.55,0.5-0.15]);
+                ,'CData',imread(self.GRAPHIC_FILEPATH+"floor-texture.png") ...
+                ,'FaceColor','texturemap'); % Make the floor cocer that x,y,z plane, with that image
 
+            self.Reset() % Finalises plate placement, colouring
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), "The enviroment has been created"};
         end
     end
@@ -58,18 +70,17 @@ classdef DishPackerRobot < handle
     methods (Access = public)
         function obj = DishPackerRobot()
         % Construct a DishPacker Object
-            obj.SetupEnviroment();
+            obj.SetupEnviroment(7);
             obj.eStopListener = addlistener(obj,'eStopEvent',@EStop);
         end
 
-        function AnimateRobot(self, robot, endEffectorPose, steps)
-        % Animates given robot from its current position to end
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    "Animating a robot"};
+        function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
+        % Checks if a given robot can go to a given pose
+            isValid = false;
+            endEffectorJoints = 0; % if already there, data is required in return vars
 
             currentJoints = robot.model.getpos;
             currentEndEffectorPose = robot.model.fkine(currentJoints).T;
-
 
             % check if the robot is already there
             distanceToPoint = DistanceHelpers.DistanceOfTwoSE3Points(currentEndEffectorPose, endEffectorPose);
@@ -94,8 +105,22 @@ classdef DishPackerRobot < handle
                 return;
             end
 
+            isValid = true;
+        end
 
+        function AnimateRobot(self, robot, endEffectorPose, steps)
+        % Animates given robot from its current position to end
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Animating a robot"};
 
+            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
+            if (not(poseReachable))
+                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                    "Position Invalid"};
+                return;
+            end
+
+            currentJoints = robot.model.getpos;
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
                 "to",self.logger.MatrixToString(endEffectorJoints)]};
@@ -116,27 +141,89 @@ classdef DishPackerRobot < handle
                 ["Animation done, finished total of ", distanceToPoint, "m from goal"]};
         end
 
-        function AnimateRobotWithObj(self, robot, endEffectorPose, steps, handle)
+        function AnimateRobotWithPlate(self, robot, endEffectorPose, steps, plateID)
         % Animates given robot from its current position to end, bringing a
         % handle at the position of the end efector
 
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Animating a robot with object"};
+
+            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
+            if (not(poseReachable))
+                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                    "Position Invalid"};
+                return;
+            end
+
+            currentJoints = robot.model.getpos;
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                ["Starting Robot & Obj animation from", self.logger.MatrixToString(currentJoints),...
+                "to",self.logger.MatrixToString(endEffectorJoints)]};
+
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
+                "to",self.logger.MatrixToString(endEffectorJoints)]};
+
+            robotTraj = jtraj(currentJoints,endEffectorJoints,steps);
+            handle = self.plate_h(plateID);
+
+            for i = 1:steps
+                q = robotTraj(i,:);
+
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    ["Moving robot to joint pos", self.logger.MatrixToString(q)]};
+
+                % Move the robot
+                robot.model.animate(q);
+                currentEndEffector = robot.model.fkine(q).T;
+
+                % Move the plate
+                HandleManipulation.SetPose(handle, currentEndEffector,self.plate_currentPose(:,:,plateID));
+                self.plate_currentPose(:,:,plateID) = currentEndEffector; % Update current pose
+                drawnow();
+            end
+
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                "Animation Done"};
+
         end
 
-        function MovePlate(self, startPos, endPos)
+        function MovePlate(self, plateID)
         % Takes a plate from the start to its expected position using both robots
+            steps = 50;
+            plateCurrentPose = self.plate_currentPose(:,:,plateID);
+
+            self.AnimateRobot(self.robot_UR3e, plateCurrentPose, steps);
+            self.AnimateRobotWithPlate(self.robot_UR3e, self.plate_handoverXYZ, ...
+                steps, plateID);
+            % bring gantry to shared location
+            % Animate the gantry to put away the plate
+            % current plate location is now at end
         end
 
         function Reset(self)
         % Resets the whole system to its "home" positions
+
+             % place the plates back
+            try delete(self.plate_h);end %#ok<TRYNC>
+
+            self.plate_h = PlaceObject(self.GRAPHIC_FILEPATH+"plate.ply", self.plate_startXYZ);
+            for i = 1:length(self.plate_h) % Colour all plates orange and set current pose
+                HandleManipulation.SetColour(self.plate_h(i), [77, 184, 255])
+                self.plate_currentPose(:,:,i) = transl(self.plate_startXYZ(i,:));
+            end
+
+            % Robots go home
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
-            self.AnimateRobot(homePose,40);
+            self.AnimateRobot(self.robot_UR3e, homePose, 5);
+
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Reset system"};
         end
 
         function Teach(self)
         % Brings up the "teach" pane for each robot
-            % self.Reset()
+            self.Reset()
             self.robot_UR3e.model.teach(self.robot_UR3e.homeQ);
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Teaching pannel is now visable"};
@@ -158,5 +245,19 @@ classdef DishPackerRobot < handle
                 "Deleting object"};
         end
 
+    end
+
+    methods (Static)
+        function [platePositions] = GeneratePlatePositions(startPos, height, count)
+        % work out the starting center of each (count) plates
+
+            platePositions = zeros(count,3);
+            startXYZ = startPos(1:3, 4);  % The translation part
+            for i = 1:count
+                platePositions(i,:) = [startXYZ(1),startXYZ(2),(startXYZ(3)+height*(i-1))];
+            end
+
+            platePositions = flip(platePositions); % make them stack top to bottom
+        end
     end
 end
