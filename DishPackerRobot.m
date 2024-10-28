@@ -12,7 +12,7 @@ classdef DishPackerRobot < handle
         % Plate data
         plate_h
         plate_startXYZ
-        plate_currentXYZ
+        plate_currentPose
         plate_handoverXYZ
         plate_endXYZ
 
@@ -22,7 +22,7 @@ classdef DishPackerRobot < handle
     end
 
     methods (Access = private)
-        function SetupEnviroment(self)
+        function SetupEnviroment(self, plateCount)
         % Create the enviroment, setup robots, place plates and other ply files
             hold on; % Put all the objects on the same plot
             %axis equal;
@@ -36,9 +36,10 @@ classdef DishPackerRobot < handle
             self.enviroment_h = PlaceObject(self.GRAPHIC_FILEPATH+"environment.ply",[0,0,0]);
 
             % Place the plates
-            plateCount = 3; % How many plates to stack
+            %plateCount = 7; % How many plates to stack
             self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(-0.25, 0, 0.7), ...
                                     15/1000, plateCount); % Generate [[x1,y1,z1], ... [xn,yn,zn]] start positions
+            self.plate_currentPose = zeros(4,4,plateCount); % This is initialised here, set in Reset()
 
             % TODO this should have an intermediete transition between two
             % points then the final points (all unique not same pos)
@@ -62,7 +63,7 @@ classdef DishPackerRobot < handle
     methods (Access = public)
         function obj = DishPackerRobot()
         % Construct a DishPacker Object
-            obj.SetupEnviroment();
+            obj.SetupEnviroment(7);
         end
 
         function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
@@ -132,7 +133,7 @@ classdef DishPackerRobot < handle
                 ["Animation done, finished total of ", distanceToPoint, "m from goal"]};
         end
 
-        function AnimateRobotWithObj(self, robot, endEffectorPose, steps, handle)
+        function AnimateRobotWithPlate(self, robot, endEffectorPose, steps, plateID)
         % Animates given robot from its current position to end, bringing a
         % handle at the position of the end efector
 
@@ -156,6 +157,7 @@ classdef DishPackerRobot < handle
                 "to",self.logger.MatrixToString(endEffectorJoints)]};
 
             robotTraj = jtraj(currentJoints,endEffectorJoints,steps);
+            handle = self.plate_h(plateID);
 
             for i = 1:steps
                 q = robotTraj(i,:);
@@ -163,12 +165,13 @@ classdef DishPackerRobot < handle
                 self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                     ["Moving robot to joint pos", self.logger.MatrixToString(q)]};
 
+                % Move the robot
                 robot.model.animate(q);
                 currentEndEffector = robot.model.fkine(q).T;
 
-                HandleManipulation.Move(handle,currentEndEffector);
-                %BUG: this needs to rotate absolutly not incrementaly
-                %HandleManipulation.AbsoluteRotation(handle, currentEndEffector);
+                % Move the plate
+                HandleManipulation.SetPose(handle, currentEndEffector,self.plate_currentPose(:,:,plateID));
+                self.plate_currentPose(:,:,plateID) = currentEndEffector; % Update current pose
                 drawnow();
             end
 
@@ -180,11 +183,11 @@ classdef DishPackerRobot < handle
         function MovePlate(self, plateID)
         % Takes a plate from the start to its expected position using both robots
             steps = 50;
-            plateCurrentPose = transl(self.plate_currentXYZ(plateID,:));
+            plateCurrentPose = self.plate_currentPose(:,:,plateID);
 
             self.AnimateRobot(self.robot_UR3e, plateCurrentPose, steps);
-            self.AnimateRobotWithObj(self.robot_UR3e, self.plate_handoverXYZ, ...
-                steps, self.plate_h(plateID));
+            self.AnimateRobotWithPlate(self.robot_UR3e, self.plate_handoverXYZ, ...
+                steps, plateID);
             % bring gantry to shared location
             % Animate the gantry to put away the plate
             % current plate location is now at end
@@ -195,10 +198,11 @@ classdef DishPackerRobot < handle
 
              % place the plates back
             try delete(self.plate_h);end %#ok<TRYNC>
-            self.plate_currentXYZ = self.plate_startXYZ;
-            self.plate_h = PlaceObject(self.GRAPHIC_FILEPATH+"plate.ply", self.plate_currentXYZ);
-            for i = 1:length(self.plate_h) % Colour all plates orange
-                HandleManipulation.SetColour(self.plate_h(i), [255, 184, 77])
+
+            self.plate_h = PlaceObject(self.GRAPHIC_FILEPATH+"plate.ply", self.plate_startXYZ);
+            for i = 1:length(self.plate_h) % Colour all plates orange and set current pose
+                HandleManipulation.SetColour(self.plate_h(i), [77, 184, 255])
+                self.plate_currentPose(:,:,i) = transl(self.plate_startXYZ(i,:));
             end
 
             % Robots go home

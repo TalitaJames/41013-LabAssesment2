@@ -14,7 +14,7 @@ classdef HandleManipulation
             set(handle,'Vertices',translatedVertices);
         end
 
-        function Move(handle, transformation)
+        function AbsoluteTranslation(handle, transformation)
             % Move handle (.ply) to a new position "transformation"
 
             vertices = get(handle,'Vertices');
@@ -23,6 +23,53 @@ classdef HandleManipulation
             translation = newCenter - currentCenter;
             HandleManipulation.Translate(handle, transl(translation));
 
+        end
+
+        function Rotate(handle, transformation)
+            % Rotate handle (.ply) by some "transformation" value
+
+            vertices = get(handle, 'Vertices');
+
+            rotationMatrix = transformation(1:3, 1:3);
+
+            % Subtract the current center, apply rotation, and re-add the center
+            currentCenter = mean(vertices);
+            centeredVertices = bsxfun(@minus, vertices, currentCenter); 
+            rotatedVertices = (rotationMatrix * centeredVertices')';     % Rotate them
+            recenteredVertices = bsxfun(@plus, rotatedVertices, currentCenter);  % Re-center
+
+            set(handle, 'Vertices', recenteredVertices);
+        end
+
+        function AbsoluteRotation(handle, targetPose, currentPose)
+            % RotatePatchToTarget rotates a handle(.ply) to the target pose
+            % handle: Handle to the .ply
+            % targetPose: 4x4 homogeneous transformation matrix of the target pose
+            % currentPose: 4x4 homogeneous transformation matrix of the current pose
+
+            % Extract rotation components (3x3 rotation matrices)
+            targetRotation = targetPose(1:3, 1:3);
+            currentRotation = currentPose(1:3, 1:3);
+
+            % Calculate the relative rotation needed to align currentPose to targetPose
+            relativeRotation = targetRotation * currentRotation';
+
+            % Get current verticies and recenter them
+            currentVertices = get(handle, 'Vertices');
+            centerPoint = mean(currentVertices, 1); % Find the center point of the patch
+            centeredVertices = currentVertices - centerPoint; % Shift vertices to the origin
+
+            % Apply the relative rotation to centered vertices
+            rotatedVertices = (relativeRotation * centeredVertices')';  % Note the transposition
+
+            % Do the rotation
+            rotatedVertices = rotatedVertices + centerPoint; % place them back at actual center
+            set(handle, 'Vertices', rotatedVertices);
+        end
+
+        function SetPose(handle, targetPose, currentPose)
+            HandleManipulation.AbsoluteTranslation(handle, targetPose);
+            HandleManipulation.AbsoluteRotation(handle, targetPose, currentPose);
         end
 
         function Scale(handle, scale)
@@ -34,28 +81,6 @@ classdef HandleManipulation
             % recenter after scale
             currentCenter = mean(vertices);
             HandleManipulation.MoveHandle(handle, transl(currentCenter));
-        end
-
-        function Rotate(handle, transformation)
-            % Rotate handle (.ply) by some "transformation" value
-        
-            vertices = get(handle, 'Vertices');
-            
-            rotationMatrix = transformation(1:3, 1:3);
-            
-            % Subtract the current center, apply rotation, and re-add the center
-            currentCenter = mean(vertices);
-            centeredVertices = bsxfun(@minus, vertices, currentCenter); 
-            rotatedVertices = (rotationMatrix * centeredVertices')';     % Rotate them
-            recenteredVertices = bsxfun(@plus, rotatedVertices, currentCenter);  % Re-center
-            
-            set(handle, 'Vertices', recenteredVertices);
-        end
-
-        function AbsoluteRotation(handle, transformation)
-            % Set the rotation of handle (.ply) to some "transformation"
-            warning("Calls Rotate and not absolute");
-            HandleManipulation.Rotate(handle, transformation);
         end
 
         function [positions] = GetPositions(handle)
