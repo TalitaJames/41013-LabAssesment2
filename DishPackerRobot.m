@@ -9,6 +9,8 @@ classdef DishPackerRobot < handle
         robot_gantry
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
 
+        eStopListener
+        
         % Plate data
         plate_h
         plate_startXYZ
@@ -22,6 +24,11 @@ classdef DishPackerRobot < handle
 
         gui % the graphical user interface
     end
+
+    events
+        eStopEvent
+    end
+
 
     methods (Access = private)
         function SetupEnviroment(self, plateCount)
@@ -66,6 +73,7 @@ classdef DishPackerRobot < handle
         function obj = DishPackerRobot()
         % Construct a DishPacker Object
             obj.SetupEnviroment(7);
+            obj.eStopListener = addlistener(obj,'eStopEvent',@EStop);
         end
 
         function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
@@ -227,7 +235,13 @@ classdef DishPackerRobot < handle
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Teaching pane exists"};
         end
-        
+
+        function EStop(self, event)
+            disp("Estop Pressed!")
+            self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                "EStop Pressed!"};
+        end
+
         function Chaos(self, e)
             self.AnimateRobot(self.robot_UR3e, e, 50);
         end
