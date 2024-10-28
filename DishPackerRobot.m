@@ -2,15 +2,14 @@ classdef DishPackerRobot < handle
 
     properties (Constant)
         GRAPHIC_FILEPATH = "graphical_models/";
+        RVCTOOLS_FILEPATH = "rvctools/robot/UTS/Parts/";
     end
 
     properties (SetAccess = private) % private variables
         robot_UR3e
         robot_gantry
 
-        % Logger commented out purely for me, maybe a windows issue
-        %logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
-        logger = log4matlab("TempLog.log"); %#ok<TNOW1,*DATST>
+        logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
 
         % Plate data
         plate_h
@@ -18,6 +17,9 @@ classdef DishPackerRobot < handle
         plate_currentPose
         plate_handoverXYZ
         plate_endXYZ
+
+        % Safety data
+        lightCurtainCheck
 
         % All enviroment handles
         enviroment_h;
@@ -43,25 +45,16 @@ classdef DishPackerRobot < handle
             self.enviroment_h = PlaceObject(self.GRAPHIC_FILEPATH+"environment.ply",[0,0,0]);
 
             % Create the safety barriers
-            self.barrier1_h = PlaceObject("rvctools/robot/UTS/Parts/barrier1.5x0.2x1m.ply",[-1,-0.45,0]);
-            self.barrier2_h = PlaceObject("rvctools/robot/UTS/Parts/barrier1.5x0.2x1m.ply",[-1.7,0.2,0]);
+            self.barrier1_h = PlaceObject(self.RVCTOOLS_FILEPATH+"barrier1.5x0.2x1m.ply",[-1,-0.45,0]);
+            self.barrier2_h = PlaceObject(self.RVCTOOLS_FILEPATH+"barrier1.5x0.2x1m.ply",[-1.7,0.2,0]);
             rotate(self.barrier2_h,[0 0 1],90,[-1.7 0.2 0]);
 
             % Create the light
-            self.WarningLight_h = PlaceObject("graphical_models/alarm.ply",[-1.9,0.3,0.8]);
-
-            %HandleManipulation.Scale(self.WarningLight_h,0.001);
-            
-            %The Scale function seems to not be fully completed so this is
-            %temp code to do the same thing
-            % (to be replaced by the above code)
-            vertices = get(self.WarningLight_h,'Vertices');
-            scaledVertices = vertices * 0.001;
-            set(self.WarningLight_h,'Vertices',scaledVertices);
-
+            self.WarningLight_h = PlaceObject(self.GRAPHIC_FILEPATH+"alarm.ply",[-1.9,0.3,0.8]);
+            HandleManipulation.Scale(self.WarningLight_h, 0.001);
 
             % Place the plates
-            %plateCount = 7; % How many plates to stack
+            %plateCount - How many plates to stack
             self.plate_startXYZ = DishPackerRobot.GeneratePlatePositions(transl(-0.25, 0, 0.7), ...
                                     15/1000, plateCount); % Generate [[x1,y1,z1], ... [xn,yn,zn]] start positions
             self.plate_currentPose = zeros(4,4,plateCount); % This is initialised here, set in Reset()
@@ -71,8 +64,6 @@ classdef DishPackerRobot < handle
             self.plate_handoverXYZ = transl(-0.314,-0.423,1.1);
             finalPlate = [-0.314,-0.423,1.1]; % where are the plates expexted to go
             self.plate_endXYZ = repmat(finalPlate, plateCount,1); %ie cupboard positions
-
-
 
             self.floor_h = surf([-1,-1; 3,3]... % X
                 ,[-2, 3;-2,3] ... % Y
@@ -84,10 +75,11 @@ classdef DishPackerRobot < handle
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), "The enviroment has been created"};
         end
         
-        function SensorCheck()
+        function blocked = LightCurtain()
         %Checks if something has passed the sensor
             %etc
             %mainly for simulated integration but needs to exist for arduino too
+            blocked = false;
         end
 
         function StopMovement()
@@ -101,17 +93,13 @@ classdef DishPackerRobot < handle
             %Flash = light("Style","Local","Position",[-1.9 0.3 0.8],"Color",[1 0 0]);
         end
 
-        function ButtonPress()
-            %Etc
-        end
     end
 
     methods (Access = public)
         function obj = DishPackerRobot()
         % Construct a DishPacker Object
             obj.SetupEnviroment(7);
-            SafetyCheck = parfeval(backgroundPool,@obj.SensorCheck,1);
-            %SensorValue = fetchOutputs(SafetyCheck);
+            obj.lightCurtainCheck = parfeval(backgroundPool,@obj.LightCurtain,1);
         end
 
         function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
