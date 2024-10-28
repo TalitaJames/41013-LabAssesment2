@@ -19,6 +19,8 @@ classdef DishPackerRobot < handle
         % All enviroment handles
         enviroment_h;
         floor_h
+
+        gui % the graphical user interface
     end
 
     methods (Access = private)
@@ -216,9 +218,14 @@ classdef DishPackerRobot < handle
         function Teach(self)
         % Brings up the "teach" pane for each robot
             self.Reset()
-            self.robot_UR3e.model.teach(self.robot_UR3e.homeQ);
+            if isempty(self.gui)
+                self.gui = Gui(self);
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                "Teaching pane created"};
+                return;
+            end
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                "Teaching pannel is now visable"};
+                "Teaching pane exists"};
         end
         
         function Chaos(self, e)
@@ -229,6 +236,8 @@ classdef DishPackerRobot < handle
         % Deletes the object, including all ascocisated handles & data
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Deleting object"};
+            delete(self.gui);
+            close('all','force')
         end
 
     end
