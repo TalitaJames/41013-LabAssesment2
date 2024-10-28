@@ -77,10 +77,6 @@ classdef HandleManipulation
             vertices = get(handle,'Vertices');
             scaledVertices = vertices * scale;
             set(handle,'Vertices',scaledVertices);
-
-            % recenter after scale
-            currentCenter = mean(vertices);
-            HandleManipulation.MoveHandle(handle, transl(currentCenter));
         end
 
         function [positions] = GetPositions(handle)
