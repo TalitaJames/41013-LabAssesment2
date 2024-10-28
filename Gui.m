@@ -1,7 +1,10 @@
 classdef Gui < handle
     properties
-        f
-        g_f
+        % GUI Interface
+        % p is for panel, g for grid
+
+        figure
+        grid_figure
 
         nlinks_arm = 6
         nlinks_gantry = 6
@@ -45,17 +48,22 @@ classdef Gui < handle
         action_human_approach_cupboard
 
         status = "STANDBY"
+
+        kitchenRobot % the attached kitchen robot
     end
 
     methods
-        function self = Gui() 
+        function self = Gui(kitchenRobot)
+            self.kitchenRobot = kitchenRobot;
+
+            % GUI Initialisation
             XYZ = ['X', 'Y', 'Z'];
             self.nlinks_arm = 6;
             self.nlinks_gantry = 6;
-            self.f = uifigure('Name', 'Dish packer robot GUI');
-            self.g_f = uigridlayout(self.f, [1 3], 'RowHeight', {'fit'}, 'ColumnWidth', {'1x', '1x', '1x'});
+            self.figure = uifigure('Name', 'Dish packer robot GUI');
+            self.grid_figure = uigridlayout(self.figure, [1 3], 'RowHeight', {'fit'}, 'ColumnWidth', {'1x', '1x', '1x'});
 
-            self.p_arm = uipanel(self.g_f, 'Title', 'Arm', 'Scrollable', 'on');
+            self.p_arm = uipanel(self.grid_figure, 'Title', 'Arm', 'Scrollable', 'on');
             self.g_arm = uigridlayout(self.p_arm, [3 1], 'RowHeight', {'fit', 'fit', 'fit'});
             self.p_arm_q = uipanel(self.g_arm, 'Title', 'Joint positions');
             self.g_arm_q = uigridlayout(self.p_arm_q, [2 1], 'RowHeight', {'fit', 20});
@@ -76,7 +84,7 @@ classdef Gui < handle
             end
             self.x_go_arm = uibutton(self.g_arm_x, 'Text', 'Go', 'ButtonPushedFcn', @(src, evt) self.ArmXYZGoPressed());
 
-            self.p_gantry = uipanel(self.g_f, 'Title', 'Gantry', 'Scrollable', 'on');
+            self.p_gantry = uipanel(self.grid_figure, 'Title', 'Gantry', 'Scrollable', 'on');
             self.g_gantry = uigridlayout(self.p_gantry, [3 1], 'RowHeight', {'fit', 'fit', 'fit'});
             self.p_gantry_q = uipanel(self.g_gantry, 'Title', 'Joint positions');
             self.g_gantry_q = uigridlayout(self.p_gantry_q, [2 1], 'RowHeight', {'fit', 20});
@@ -97,7 +105,7 @@ classdef Gui < handle
             end
             self.x_go_gantry = uibutton(self.g_gantry_x, 'Text', 'Go');
 
-            self.p_actions = uipanel(self.g_f, 'Title', 'Actions');
+            self.p_actions = uipanel(self.grid_figure, 'Title', 'Actions');
             self.g_actions = uigridlayout(self.p_actions, [5 1], 'RowHeight', {'fit', 'fit', 'fit', 'fit', 'fit'}, 'Scrollable', 'on');
             self.status_label = uilabel(self.g_actions, 'Text', 'Status STANDY');
             self.action_estop = uibutton(self.g_actions, 'Text', 'Emergency stop', 'FontColor', 'white', 'BackgroundColor', 'red', 'ButtonPushedFcn', @(src, evt) self.EStopPressed());
@@ -131,6 +139,7 @@ classdef Gui < handle
         end
 
         function EStopPressed(self)
+            %self.kitchenRobot.EStop()
             if self.status == "STANDBY"
                 self.DoEstop();
             else
