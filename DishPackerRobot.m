@@ -10,13 +10,17 @@ classdef DishPackerRobot < handle
         robot_gantry
 
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
-
+        
         % Plate data
         plate_h
         plate_startXYZ
         plate_currentPose
         plate_handoverXYZ
         plate_endXYZ
+        plate_doneStatus
+
+        % Safety data
+        eStopStatus = false;
 
         % Safety data
         lightCurtainCheck
@@ -28,6 +32,7 @@ classdef DishPackerRobot < handle
         barrier2_h
         WarningLight_h
 
+        gui % the graphical user interface
     end
 
     methods (Access = private)
@@ -136,97 +141,103 @@ classdef DishPackerRobot < handle
             isValid = true;
         end
 
-        function AnimateRobot(self, robot, endEffectorPose, steps)
+        function AnimateRobotWithJointAngles(self, robot, endJointAngles, steps, plateID)
         % Animates given robot from its current position to end
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    "Animating a robot"};
-
-            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
-            if (not(poseReachable))
-                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
-                    "Position Invalid"};
-                return;
-            end
+                    "Animating a robot with joint angles"};
 
             currentJoints = robot.model.getpos;
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
-                "to",self.logger.MatrixToString(endEffectorJoints)]};
+                "to",self.logger.MatrixToString(endJointAngles)]};
 
-            robotTraj = jtraj(currentJoints,endEffectorJoints,steps);
+            robotTraj = jtraj(currentJoints,endJointAngles,steps);
 
-            for i = 1:steps
-                robot.model.animate(robotTraj(i,:));
-                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    ["Robot at joint pos", self.logger.MatrixToString(robotTraj(i,:))]};
-                drawnow();
-            end
-
-            currentJoints = robot.model.getpos;
-            currentEndEffectorPose = robot.model.fkine(currentJoints).T;
-            distanceToPoint = DistanceHelpers.DistanceOfTwoSE3Points(currentEndEffectorPose, endEffectorPose);
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                ["Animation done, finished total of ", distanceToPoint, "m from goal"]};
-        end
-
-        function AnimateRobotWithPlate(self, robot, endEffectorPose, steps, plateID)
-        % Animates given robot from its current position to end, bringing a
-        % handle at the position of the end efector
-
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    "Animating a robot with object"};
-
-            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
-            if (not(poseReachable))
-                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
-                    "Position Invalid"};
-                return;
-            end
-
-            currentJoints = robot.model.getpos;
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                ["Starting Robot & Obj animation from", self.logger.MatrixToString(currentJoints),...
-                "to",self.logger.MatrixToString(endEffectorJoints)]};
-
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
-                "to",self.logger.MatrixToString(endEffectorJoints)]};
-
-            robotTraj = jtraj(currentJoints,endEffectorJoints,steps);
-            handle = self.plate_h(plateID);
+             if exist('plateID','var')
+                 % third parameter does not exist, so default it to something
+                  plate_handle = self.plate_h(plateID);
+             end
 
             for i = 1:steps
+                if(self.eStopStatus)
+                    return;
+                end
+
                 q = robotTraj(i,:);
-
-                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    ["Moving robot to joint pos", self.logger.MatrixToString(q)]};
+                %self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                %    ["Robot at joint pos", self.logger.MatrixToString(q)]};
 
                 % Move the robot
                 robot.model.animate(q);
                 currentEndEffector = robot.model.fkine(q).T;
-
-                % Move the plate
-                HandleManipulation.SetPose(handle, currentEndEffector,self.plate_currentPose(:,:,plateID));
-                self.plate_currentPose(:,:,plateID) = currentEndEffector; % Update current pose
+                
+                if exist('plateID','var')
+                    % Move the plate
+                    HandleManipulation.SetPose(plate_handle, currentEndEffector,self.plate_currentPose(:,:,plateID));
+                    self.plate_currentPose(:,:,plateID) = currentEndEffector; % Update current pose
+                end
+                
                 drawnow();
             end
 
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                "Animation Done"};
+        end
 
+        function AnimateRobotWithEndEffector(self, robot, endEffectorPose, steps, plateID)
+        % Animates given robot from its current position to end
+            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
+            if (not(poseReachable))
+                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                    "Position Invalid"};
+                return;
+            end
+
+            % if the end joints exist, run the function
+            % (only pass plateID if it exists)
+            if exist('plateID','var')
+                self.AnimateRobotWithJointAngles(robot, endEffectorJoints, steps, plateID);
+            else
+                self.AnimateRobotWithJointAngles(robot, endEffectorJoints, steps); 
+            end
+        end
+
+        function MoveAll(self)
+            % Moves all plates to end
+            for i = 1:length(self.plate_doneStatus)
+                if(not(self.plate_doneStatus(i)))
+                    self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                        ["Moving Plate ",i]};
+                    self.MovePlate(i);
+                else
+                    self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                        ["Plate already there!",i]};
+                end
+            end
         end
 
         function MovePlate(self, plateID)
         % Takes a plate from the start to its expected position using both robots
-            steps = 50;
-            plateCurrentPose = self.plate_currentPose(:,:,plateID);
+            if(not(self.eStopStatus))
+                steps = 50;
+                plateCurrentPose = self.plate_currentPose(:,:,plateID);
 
-            self.AnimateRobot(self.robot_UR3e, plateCurrentPose, steps);
-            self.AnimateRobotWithPlate(self.robot_UR3e, self.plate_handoverXYZ, ...
-                steps, plateID);
-            % bring gantry to shared location
-            % Animate the gantry to put away the plate
-            % current plate location is now at end
+                self.AnimateRobotWithEndEffector(self.robot_UR3e, plateCurrentPose, steps);
+                self.AnimateRobotWithEndEffector(self.robot_UR3e, self.plate_handoverXYZ, ...
+                    steps, plateID);
+                % bring gantry to shared location
+                % Animate the gantry to put away the plate
+                % current plate location is now at end
+
+                if(DistanceHelpers.DistanceOfTwoSE3Points(self.plate_currentPose(:,:,plateID), ...
+                        transl(self.plate_endXYZ(plateID,:)) ) < 0.05 )
+                    self.plate_doneStatus(plateID) = true; % plate is away!
+                end
+
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    ["Done Moving Plate!",plateID]};
+            else
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Can't Move - Estop Enabled!"};
+            end
         end
 
         function Reset(self)
@@ -240,11 +251,13 @@ classdef DishPackerRobot < handle
                 HandleManipulation.SetColour(self.plate_h(i), [77, 184, 255])
                 self.plate_currentPose(:,:,i) = transl(self.plate_startXYZ(i,:));
             end
+            self.plate_doneStatus = false(1, length(self.plate_h)); % none of the plates are placed
 
             % Robots go home
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
-            self.AnimateRobot(self.robot_UR3e, homePose, 5);
+            self.AnimateRobotWithEndEffector(self.robot_UR3e, homePose, 5);
 
+            self.eStopStatus = false;
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Reset system"};
         end
@@ -252,19 +265,32 @@ classdef DishPackerRobot < handle
         function Teach(self)
         % Brings up the "teach" pane for each robot
             self.Reset()
-            self.robot_UR3e.model.teach(self.robot_UR3e.homeQ);
+            if isempty(self.gui)
+                self.gui = Gui(self);
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                "Teaching pane created"};
+                return;
+            end
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                "Teaching pannel is now visable"};
+                "Teaching pane exists"};
         end
-        
+
+        function EStop(self)
+            self.eStopStatus = not(self.eStopStatus);
+            self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
+                ["EStop Pressed, status", self.eStopStatus]};
+        end
+
         function Chaos(self, e)
-            self.AnimateRobot(self.robot_UR3e, e, 50);
+            self.AnimateRobotWithEndEffector(self.robot_UR3e, e, 50);
         end
 
         function delete(self)
         % Deletes the object, including all ascocisated handles & data
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Deleting object"};
+            delete(self.gui);
+            close('all','force')
         end
 
     end
