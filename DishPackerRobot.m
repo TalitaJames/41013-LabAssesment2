@@ -17,7 +17,7 @@ classdef DishPackerRobot < handle
         plate_endXYZ
 
         % Safety data
-        eStopStatus
+        eStopStatus = false;
 
         % All enviroment handles
         enviroment_h;
@@ -234,6 +234,7 @@ classdef DishPackerRobot < handle
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
             self.AnimateRobotWithEndEffector(self.robot_UR3e, homePose, 5);
 
+            self.eStopStatus = false;
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Reset system"};
         end
@@ -252,9 +253,9 @@ classdef DishPackerRobot < handle
         end
 
         function EStop(self)
-            disp("Estop Pressed!")
+            self.eStopStatus = not(self.eStopStatus);
             self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
-                "EStop Pressed!"};
+                ["EStop Pressed, status", self.eStopStatus]};
         end
 
         function Chaos(self, e)

@@ -46,6 +46,7 @@ classdef Gui < handle
         action_demo
         action_human_approach_arm
         action_human_approach_cupboard
+        action_updatePositions
 
         status = "STANDBY"
 
@@ -111,18 +112,21 @@ classdef Gui < handle
 
             % Actions
             self.p_actions = uipanel(self.grid_figure, 'Title', 'Actions');
-            self.g_actions = uigridlayout(self.p_actions, [5 1], 'RowHeight', {'fit', 'fit', 'fit', 'fit', 'fit'}, 'Scrollable', 'on');
+            self.g_actions = uigridlayout(self.p_actions, [6 1], 'RowHeight', {'fit', 'fit', 'fit', 'fit', 'fit', 'fit'}, 'Scrollable', 'on');
+
             self.status_label = uilabel(self.g_actions, 'Text', 'Status STANDY');
             self.action_estop = uibutton(self.g_actions, 'Text', 'Emergency stop', 'FontColor', 'white', 'BackgroundColor', 'red', 'ButtonPushedFcn', @(src, evt) self.EStopPressed());
-            self.action_demo = uibutton(self.g_actions, 'Text', 'Demo');
+            self.action_demo = uibutton(self.g_actions, 'Text', 'Demo', 'ButtonPushedFcn', @(src, evt) self.Demo());
+            self.action_updatePositions = uibutton(self.g_actions, 'Text', 'Update Positions', 'ButtonPushedFcn', @(src, evt) self.UpdateAllPositions());
             self.action_human_approach_arm = uibutton(self.g_actions, 'Text', 'Show human approaching arm');
             self.action_human_approach_cupboard = uibutton(self.g_actions, 'Text', 'Show human approaching cupboard');
+            
+
+            self.UpdateAllPositions(); %set correct initial vals
         end
 
         % UR3e Movement
         function ArmQGoPressed(self)
-            disp("Move arm q")
-
             % Get the Q values
             qValues = zeros(1,self.nlinks_arm);
             for i = 1:self.nlinks_arm
@@ -135,11 +139,15 @@ classdef Gui < handle
         end
 
         function ArmXYZGoPressed(self)
-            disp("Move arm xyz")
-            for i = 1:self.nlinks_arm
-                edit = self.qs_edit_arm{i};
-                edit.Value = 0;
+            % get XYZ
+            xyz=zeros(1,3);
+            for i = 1:3
+                edit = self.xs_edit_arm{i};
+                xyz(i) = edit.Value;
             end
+
+            self.kitchenRobot.AnimateRobotWithEndEffector(self.kitchenRobot.robot_UR3e, ...
+                transl(xyz),50);
             self.UpdateArmPosition();
         end
 
@@ -169,10 +177,24 @@ classdef Gui < handle
 
         %Gantry Movement
         function GantryQGoPressed(self)
+            % Get the Q values
+            qValues = zeros(1,self.nlinks_arm);
+            for i = 1:self.nlinks_arm
+                edit = self.qs_edit_gantry{i}; % get the current 
+                qValues(i) = edit.Value;
+            end
+            
             self.UpdateGantryPosition();
         end
 
         function GantryXYZGoPressed(self)
+            % get XYZ
+            xyz=zeros(1,3);
+            for i = 1:3
+                edit = self.xs_edit_gantry{i};
+                xyz(i) = edit.Value;
+            end
+
             self.UpdateGantryPosition();
         end
 
@@ -198,27 +220,34 @@ classdef Gui < handle
             end
         end
 
-
+        % Action Buttons
         function EStopPressed(self)
             self.kitchenRobot.EStop()
-            if self.status == "STANDBY"
-                self.DoEstop();
+
+            self.status = "STANDBY";
+            if (self.kitchenRobot.eStopStatus)
+                self.status = "ESTOP ON";
             else
-                self.UndoEstop();
+                self.status = "STANDBY";
             end
             self.UpdateStatusText();
+        end
+
+        function Demo(self)
+            for i = 1:length(self.kitchenRobot.plate_h)
+                self.kitchenRobot.MovePlate(i);
+            end
+        end
+
+        function UpdateAllPositions(self)
+            self.UpdateGantryPosition();
+            self.UpdateArmPosition();
         end
 
         function UpdateStatusText(self)
             self.status_label.Text = sprintf("Status %s", self.status);
         end
 
-        function DoEstop(self)
-            self.status = "ESTOP";
-        end
-
-        function UndoEstop(self)
-            self.status = "STANDBY";
-        end
+        
     end
 end
