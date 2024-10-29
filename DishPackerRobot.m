@@ -10,6 +10,10 @@ classdef DishPackerRobot < handle
         robot_gantry
 
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
+
+        arduinoObject = arduino('/dev/ttyACM0','Uno')
+        arduinoButtonCheck
+        timer
         
         % Plate data
         plate_h
@@ -98,6 +102,14 @@ classdef DishPackerRobot < handle
             %Flash = light("Style","Local","Position",[-1.9 0.3 0.8],"Color",[1 0 0]);
         end
 
+        function ReadArduinoButton(self)
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Checking Button"};
+
+            if ( boolean(readDigitalPin(self.arduinoObject,'D2')) )
+                self.gui.EStopPressed();
+            end
+        end
     end
 
     methods (Access = public)
@@ -105,6 +117,14 @@ classdef DishPackerRobot < handle
         % Construct a DishPacker Object
             obj.SetupEnviroment(7);
             obj.lightCurtainCheck = parfeval(backgroundPool,@obj.LightCurtain,1);
+
+            % Create the timer
+            obj.timer = timer;
+            obj.timer.ExecutionMode = 'fixedRate';
+            obj.timer.Period = 0.75; %[sec]
+            obj.timer.TimerFcn = @(~,~) obj.ReadArduinoButton(); % Call function to check pin
+
+            start(obj.timer);
         end
 
         function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
@@ -290,6 +310,7 @@ classdef DishPackerRobot < handle
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Deleting object"};
             delete(self.gui);
+            delete(self.timer);
             close('all','force')
         end
 
