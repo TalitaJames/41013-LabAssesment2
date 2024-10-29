@@ -105,7 +105,7 @@ classdef DishPackerRobot < handle
             isValid = true;
         end
 
-        function AnimateRobotWithJointAngles(self, robot, endJointAngles, steps)
+        function AnimateRobotWithJointAngles(self, robot, endJointAngles, steps, plateID)
         % Animates given robot from its current position to end
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                     "Animating a robot with joint angles"};
@@ -117,19 +117,34 @@ classdef DishPackerRobot < handle
 
             robotTraj = jtraj(currentJoints,endJointAngles,steps);
 
+             if exist('plateID','var')
+                 % third parameter does not exist, so default it to something
+                  plate_handle = self.plate_h(plateID);
+             end
+
             for i = 1:steps
-                robot.model.animate(robotTraj(i,:));
+                q = robotTraj(i,:);
+
                 self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    ["Robot at joint pos", self.logger.MatrixToString(robotTraj(i,:))]};
+                    ["Robot at joint pos", self.logger.MatrixToString(q)]};
+
+                % Move the robot
+                robot.model.animate(q);
+                currentEndEffector = robot.model.fkine(q).T;
+                
+                if exist('plateID','var')
+                    % Move the plate
+                    HandleManipulation.SetPose(plate_handle, currentEndEffector,self.plate_currentPose(:,:,plateID));
+                    self.plate_currentPose(:,:,plateID) = currentEndEffector; % Update current pose
+                end
+                
                 drawnow();
             end
+
         end
 
-        function AnimateRobotWithEndEffector(self, robot, endEffectorPose, steps)
+        function AnimateRobotWithEndEffector(self, robot, endEffectorPose, steps, plateID)
         % Animates given robot from its current position to end
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    "Animating a robot"};
-
             [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
             if (not(poseReachable))
                 self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
@@ -137,25 +152,12 @@ classdef DishPackerRobot < handle
                 return;
             end
 
-            currentJoints = robot.model.getpos;
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
-                "to",self.logger.MatrixToString(endEffectorJoints)]};
-
-            robotTraj = jtraj(currentJoints,endEffectorJoints,steps);
-
-            for i = 1:steps
-                robot.model.animate(robotTraj(i,:));
-                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    ["Robot at joint pos", self.logger.MatrixToString(robotTraj(i,:))]};
-                drawnow();
+            if exist('plateID','var')
+                self.AnimateRobotWithJointAngles(robot, endEffectorJoints, steps, plateID);
+            else
+                self.AnimateRobotWithJointAngles(robot, endEffectorJoints, steps); 
             end
 
-            currentJoints = robot.model.getpos;
-            currentEndEffectorPose = robot.model.fkine(currentJoints).T;
-            distanceToPoint = DistanceHelpers.DistanceOfTwoSE3Points(currentEndEffectorPose, endEffectorPose);
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                ["Animation done, finished total of ", distanceToPoint, "m from goal"]};
         end
 
         function AnimateRobotWithPlate(self, robot, endEffectorPose, steps, plateID)
@@ -211,7 +213,7 @@ classdef DishPackerRobot < handle
             plateCurrentPose = self.plate_currentPose(:,:,plateID);
 
             self.AnimateRobotWithEndEffector(self.robot_UR3e, plateCurrentPose, steps);
-            self.AnimateRobotWithPlate(self.robot_UR3e, self.plate_handoverXYZ, ...
+            self.AnimateRobotWithEndEffector(self.robot_UR3e, self.plate_handoverXYZ, ...
                 steps, plateID);
             % bring gantry to shared location
             % Animate the gantry to put away the plate
