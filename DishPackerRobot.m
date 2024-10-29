@@ -8,8 +8,6 @@ classdef DishPackerRobot < handle
         robot_UR3e
         robot_gantry
         logger = log4matlab("out/"+ datestr(now,'yyyymmdd-HHMM') +".log"); %#ok<TNOW1,*DATST>
-
-        eStopListener
         
         % Plate data
         plate_h
@@ -18,17 +16,15 @@ classdef DishPackerRobot < handle
         plate_handoverXYZ
         plate_endXYZ
 
+        % Safety data
+        eStopStatus
+
         % All enviroment handles
         enviroment_h;
         floor_h
 
         gui % the graphical user interface
     end
-
-    events
-        eStopEvent
-    end
-
 
     methods (Access = private)
         function SetupEnviroment(self, plateCount)
@@ -73,7 +69,6 @@ classdef DishPackerRobot < handle
         function obj = DishPackerRobot()
         % Construct a DishPacker Object
             obj.SetupEnviroment(7);
-            obj.eStopListener = addlistener(obj,'eStopEvent',@EStop);
         end
 
         function [isValid, endEffectorJoints] = CanReachPose(self, robot, endEffectorPose)
@@ -110,7 +105,27 @@ classdef DishPackerRobot < handle
             isValid = true;
         end
 
-        function AnimateRobot(self, robot, endEffectorPose, steps)
+        function AnimateRobotWithJointAngles(self, robot, endJointAngles, steps)
+        % Animates given robot from its current position to end
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Animating a robot with joint angles"};
+
+            currentJoints = robot.model.getpos;
+            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
+                "to",self.logger.MatrixToString(endJointAngles)]};
+
+            robotTraj = jtraj(currentJoints,endJointAngles,steps);
+
+            for i = 1:steps
+                robot.model.animate(robotTraj(i,:));
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    ["Robot at joint pos", self.logger.MatrixToString(robotTraj(i,:))]};
+                drawnow();
+            end
+        end
+
+        function AnimateRobotWithEndEffector(self, robot, endEffectorPose, steps)
         % Animates given robot from its current position to end
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                     "Animating a robot"};
@@ -195,7 +210,7 @@ classdef DishPackerRobot < handle
             steps = 50;
             plateCurrentPose = self.plate_currentPose(:,:,plateID);
 
-            self.AnimateRobot(self.robot_UR3e, plateCurrentPose, steps);
+            self.AnimateRobotWithEndEffector(self.robot_UR3e, plateCurrentPose, steps);
             self.AnimateRobotWithPlate(self.robot_UR3e, self.plate_handoverXYZ, ...
                 steps, plateID);
             % bring gantry to shared location
@@ -217,7 +232,7 @@ classdef DishPackerRobot < handle
 
             % Robots go home
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;
-            self.AnimateRobot(self.robot_UR3e, homePose, 5);
+            self.AnimateRobotWithEndEffector(self.robot_UR3e, homePose, 5);
 
             self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
                 "Reset system"};
@@ -236,14 +251,14 @@ classdef DishPackerRobot < handle
                 "Teaching pane exists"};
         end
 
-        function EStop(self, event)
+        function EStop(self)
             disp("Estop Pressed!")
             self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
                 "EStop Pressed!"};
         end
 
         function Chaos(self, e)
-            self.AnimateRobot(self.robot_UR3e, e, 50);
+            self.AnimateRobotWithEndEffector(self.robot_UR3e, e, 50);
         end
 
         function delete(self)

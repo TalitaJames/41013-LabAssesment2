@@ -63,9 +63,10 @@ classdef Gui < handle
             self.figure = uifigure('Name', 'Dish packer robot GUI');
             self.grid_figure = uigridlayout(self.figure, [1 3], 'RowHeight', {'fit'}, 'ColumnWidth', {'1x', '1x', '1x'});
 
+            % Arm
             self.p_arm = uipanel(self.grid_figure, 'Title', 'Arm', 'Scrollable', 'on');
             self.g_arm = uigridlayout(self.p_arm, [3 1], 'RowHeight', {'fit', 'fit', 'fit'});
-            self.p_arm_q = uipanel(self.g_arm, 'Title', 'Joint positions');
+            self.p_arm_q = uipanel(self.g_arm, 'Title', 'Joint Positions [Rad]');
             self.g_arm_q = uigridlayout(self.p_arm_q, [2 1], 'RowHeight', {'fit', 20});
             self.g_arm_qs = uigridlayout(self.g_arm_q, [self.nlinks_arm 2], 'ColumnWidth', {'fit', '1x'});
             self.qs_label_arm = cell(self.nlinks_arm, 1);
@@ -75,7 +76,8 @@ classdef Gui < handle
                 self.qs_edit_arm{i} = uieditfield(self.g_arm_qs, 'numeric', 'Value', 0);
             end
             self.q_go_arm = uibutton(self.g_arm_q, 'Text', 'Go', 'ButtonPushedFcn', @(src, evt) self.ArmQGoPressed());
-            self.p_arm_x = uipanel(self.g_arm, 'Title', 'End effector position');
+
+            self.p_arm_x = uipanel(self.g_arm, 'Title', 'End Effector Position [m]');
             self.g_arm_x = uigridlayout(self.p_arm_x, [2 1], 'RowHeight', {'fit', 20});
             self.g_arm_xs = uigridlayout(self.g_arm_x, [3 2], 'ColumnWidth', {'fit', '1x'});
             for i = 1:3
@@ -84,9 +86,10 @@ classdef Gui < handle
             end
             self.x_go_arm = uibutton(self.g_arm_x, 'Text', 'Go', 'ButtonPushedFcn', @(src, evt) self.ArmXYZGoPressed());
 
+            % Gantry
             self.p_gantry = uipanel(self.grid_figure, 'Title', 'Gantry', 'Scrollable', 'on');
             self.g_gantry = uigridlayout(self.p_gantry, [3 1], 'RowHeight', {'fit', 'fit', 'fit'});
-            self.p_gantry_q = uipanel(self.g_gantry, 'Title', 'Joint positions');
+            self.p_gantry_q = uipanel(self.g_gantry, 'Title', 'Joint Positions [Rad]');
             self.g_gantry_q = uigridlayout(self.p_gantry_q, [2 1], 'RowHeight', {'fit', 20});
             self.g_gantry_qs = uigridlayout(self.g_gantry_q, [self.nlinks_gantry 2], 'ColumnWidth', {'fit', '1x'});
             self.qs_label_gantry = cell(self.nlinks_gantry, 1);
@@ -95,16 +98,18 @@ classdef Gui < handle
                 self.qs_label_gantry{i} = uilabel(self.g_gantry_qs, 'Text', sprintf('%d', i));
                 self.qs_edit_gantry{i} = uieditfield(self.g_gantry_qs, 'numeric', 'Value', 0);
             end
-            self.q_go_gantry = uibutton(self.g_gantry_q, 'Text', 'Go');
-            self.p_gantry_x = uipanel(self.g_gantry, 'Title', 'End effector position');
+            self.q_go_gantry = uibutton(self.g_gantry_q, 'Text', 'Go', 'ButtonPushedFcn', @(src, evt) self.GantryQGoPressed());
+
+            self.p_gantry_x = uipanel(self.g_gantry, 'Title', 'End Effector Position [m]');
             self.g_gantry_x = uigridlayout(self.p_gantry_x, [2 1], 'RowHeight', {'fit', 20});
             self.g_gantry_xs = uigridlayout(self.g_gantry_x, [3 2], 'ColumnWidth', {'fit', '1x'});
             for i = 1:3
                 self.xs_label_gantry{i} = uilabel(self.g_gantry_xs, 'Text', XYZ(i));
                 self.xs_edit_gantry{i} = uieditfield(self.g_gantry_xs, 'numeric', 'Value', 0);
             end
-            self.x_go_gantry = uibutton(self.g_gantry_x, 'Text', 'Go');
+            self.x_go_gantry = uibutton(self.g_gantry_x, 'Text', 'Go', 'ButtonPushedFcn', @(src, evt) self.GantryXYZGoPressed());
 
+            % Actions
             self.p_actions = uipanel(self.grid_figure, 'Title', 'Actions');
             self.g_actions = uigridlayout(self.p_actions, [5 1], 'RowHeight', {'fit', 'fit', 'fit', 'fit', 'fit'}, 'Scrollable', 'on');
             self.status_label = uilabel(self.g_actions, 'Text', 'Status STANDY');
@@ -114,16 +119,19 @@ classdef Gui < handle
             self.action_human_approach_cupboard = uibutton(self.g_actions, 'Text', 'Show human approaching cupboard');
         end
 
+        % UR3e Movement
         function ArmQGoPressed(self)
             disp("Move arm q")
+
+            % Get the Q values
+            qValues = zeros(1,self.nlinks_arm);
             for i = 1:self.nlinks_arm
-                edit = self.qs_edit_arm{i};
-                edit.Value = 1;
+                edit = self.qs_edit_arm{i}; % get the current 
+                qValues(i) = edit.Value;
             end
-            for i = 1:3
-                edit = self.xs_edit_arm{i};
-                edit.Value = 0;
-            end
+
+            self.kitchenRobot.AnimateRobotWithJointAngles(self.kitchenRobot.robot_UR3e,qValues, 50);
+            self.UpdateArmPosition();
         end
 
         function ArmXYZGoPressed(self)
@@ -132,14 +140,67 @@ classdef Gui < handle
                 edit = self.qs_edit_arm{i};
                 edit.Value = 0;
             end
+            self.UpdateArmPosition();
+        end
+
+        function UpdateArmPosition(self)
+            % querie the UR3e (arm) robot and update position in textbox
+            robot = self.kitchenRobot.robot_UR3e;
+
+            armJoints = robot.model.getpos;
+            armEndEffector = robot.model.fkine(armJoints).T;
+            armXYZ = armEndEffector(1:3,4);
+
+
+            % Update the Joint Positions
+            %armJoints = rad2deg(robot.model.getpos);
+            for i = 1:self.nlinks_arm
+                edit = self.qs_edit_arm{i};
+                edit.Value = armJoints(i);
+            end
+
+            % Update XYZ
             for i = 1:3
                 edit = self.xs_edit_arm{i};
-                edit.Value = 1;
+                edit.Value = armXYZ(i);
             end
         end
 
+
+        %Gantry Movement
+        function GantryQGoPressed(self)
+            self.UpdateGantryPosition();
+        end
+
+        function GantryXYZGoPressed(self)
+            self.UpdateGantryPosition();
+        end
+
+        function UpdateGantryPosition(self)
+            % querie the Gantry robot and update position in textbox
+            robot = self.kitchenRobot.robot_gantry;
+
+            armJoints = robot.model.getpos;
+            armEndEffector = robot.model.fkine(armJoints).T;
+            armXYZ = armEndEffector(1:3,4);
+
+            % Update the Joint Positions
+            %armJoints = rad2deg(robot.model.getpos);
+            for i = 1:self.nlinks_arm
+                edit = self.qs_edit_gantry{i};
+                edit.Value = armJoints(i);
+            end
+
+            % Update XYZ
+            for i = 1:3
+                edit = self.xs_edit_gantry{i};
+                edit.Value = armXYZ(i);
+            end
+        end
+
+
         function EStopPressed(self)
-            %self.kitchenRobot.EStop()
+            self.kitchenRobot.EStop()
             if self.status == "STANDBY"
                 self.DoEstop();
             else
