@@ -44,9 +44,10 @@ classdef Gui < handle
         status_label
         action_estop
         action_demo
+        action_updatePositions
+        action_reset
         action_human_approach_arm
         action_human_approach_cupboard
-        action_updatePositions
 
         status = "STANDBY"
 
@@ -118,8 +119,9 @@ classdef Gui < handle
             self.action_estop = uibutton(self.g_actions, 'Text', 'Emergency stop', 'FontColor', 'white', 'BackgroundColor', 'red', 'ButtonPushedFcn', @(src, evt) self.EStopPressed());
             self.action_demo = uibutton(self.g_actions, 'Text', 'Demo', 'ButtonPushedFcn', @(src, evt) self.Demo());
             self.action_updatePositions = uibutton(self.g_actions, 'Text', 'Update Positions', 'ButtonPushedFcn', @(src, evt) self.UpdateAllPositions());
+            self.action_reset = uibutton(self.g_actions, 'Text', 'Reset System', 'ButtonPushedFcn', @(src, evt) self.kitchenRobot.Reset());
             self.action_human_approach_arm = uibutton(self.g_actions, 'Text', 'Show human approaching arm');
-            self.action_human_approach_cupboard = uibutton(self.g_actions, 'Text', 'Show human approaching cupboard');
+            %self.action_human_approach_cupboard = uibutton(self.g_actions, 'Text', 'Show human approaching cupboard');
             
 
             self.UpdateAllPositions(); %set correct initial vals
