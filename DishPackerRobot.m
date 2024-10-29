@@ -15,6 +15,7 @@ classdef DishPackerRobot < handle
         plate_currentPose
         plate_handoverXYZ
         plate_endXYZ
+        plate_doneStatus
 
         % Safety data
         eStopStatus = false;
@@ -123,10 +124,13 @@ classdef DishPackerRobot < handle
              end
 
             for i = 1:steps
-                q = robotTraj(i,:);
+                if(self.eStopStatus)
+                    return;
+                end
 
-                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    ["Robot at joint pos", self.logger.MatrixToString(q)]};
+                q = robotTraj(i,:);
+                %self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                %    ["Robot at joint pos", self.logger.MatrixToString(q)]};
 
                 % Move the robot
                 robot.model.animate(q);
@@ -152,72 +156,53 @@ classdef DishPackerRobot < handle
                 return;
             end
 
+            % if the end joints exist, run the function
+            % (only pass plateID if it exists)
             if exist('plateID','var')
                 self.AnimateRobotWithJointAngles(robot, endEffectorJoints, steps, plateID);
             else
                 self.AnimateRobotWithJointAngles(robot, endEffectorJoints, steps); 
             end
-
         end
 
-        function AnimateRobotWithPlate(self, robot, endEffectorPose, steps, plateID)
-        % Animates given robot from its current position to end, bringing a
-        % handle at the position of the end efector
-
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    "Animating a robot with object"};
-
-            [poseReachable, endEffectorJoints] = self.CanReachPose(robot,endEffectorPose);
-            if (not(poseReachable))
-                self.logger.mlog = {self.logger.WARN, mfilename('class'), ...
-                    "Position Invalid"};
-                return;
+        function MoveAll(self)
+            % Moves all plates to end
+            for i = 1:length(self.plate_doneStatus)
+                if(not(self.plate_doneStatus(i)))
+                    self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                        ["Moving Plate ",i]};
+                    self.MovePlate(i);
+                else
+                    self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                        ["Plate already there!",i]};
+                end
             end
-
-            currentJoints = robot.model.getpos;
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                ["Starting Robot & Obj animation from", self.logger.MatrixToString(currentJoints),...
-                "to",self.logger.MatrixToString(endEffectorJoints)]};
-
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                ["Starting Robot animation from", self.logger.MatrixToString(currentJoints),...
-                "to",self.logger.MatrixToString(endEffectorJoints)]};
-
-            robotTraj = jtraj(currentJoints,endEffectorJoints,steps);
-            handle = self.plate_h(plateID);
-
-            for i = 1:steps
-                q = robotTraj(i,:);
-
-                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                    ["Moving robot to joint pos", self.logger.MatrixToString(q)]};
-
-                % Move the robot
-                robot.model.animate(q);
-                currentEndEffector = robot.model.fkine(q).T;
-
-                % Move the plate
-                HandleManipulation.SetPose(handle, currentEndEffector,self.plate_currentPose(:,:,plateID));
-                self.plate_currentPose(:,:,plateID) = currentEndEffector; % Update current pose
-                drawnow();
-            end
-
-            self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
-                "Animation Done"};
-
         end
 
         function MovePlate(self, plateID)
         % Takes a plate from the start to its expected position using both robots
-            steps = 50;
-            plateCurrentPose = self.plate_currentPose(:,:,plateID);
+            if(not(self.eStopStatus))
+                steps = 50;
+                plateCurrentPose = self.plate_currentPose(:,:,plateID);
 
-            self.AnimateRobotWithEndEffector(self.robot_UR3e, plateCurrentPose, steps);
-            self.AnimateRobotWithEndEffector(self.robot_UR3e, self.plate_handoverXYZ, ...
-                steps, plateID);
-            % bring gantry to shared location
-            % Animate the gantry to put away the plate
-            % current plate location is now at end
+                self.AnimateRobotWithEndEffector(self.robot_UR3e, plateCurrentPose, steps);
+                self.AnimateRobotWithEndEffector(self.robot_UR3e, self.plate_handoverXYZ, ...
+                    steps, plateID);
+                % bring gantry to shared location
+                % Animate the gantry to put away the plate
+                % current plate location is now at end
+
+                if(DistanceHelpers.DistanceOfTwoSE3Points(self.plate_currentPose(:,:,plateID), ...
+                        transl(self.plate_endXYZ(plateID,:)) ) < 0.05 )
+                    self.plate_doneStatus(plateID) = true; % plate is away!
+                end
+
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    ["Done Moving Plate!",plateID]};
+            else
+                self.logger.mlog = {self.logger.DEBUG, mfilename('class'), ...
+                    "Can't Move - Estop Enabled!"};
+            end
         end
 
         function Reset(self)
@@ -231,6 +216,7 @@ classdef DishPackerRobot < handle
                 HandleManipulation.SetColour(self.plate_h(i), [77, 184, 255])
                 self.plate_currentPose(:,:,i) = transl(self.plate_startXYZ(i,:));
             end
+            self.plate_doneStatus = false(1, length(self.plate_h)); % none of the plates are placed
 
             % Robots go home
             homePose = self.robot_UR3e.model.fkine(self.robot_UR3e.homeQ).T;

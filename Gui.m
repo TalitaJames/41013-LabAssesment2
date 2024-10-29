@@ -234,9 +234,7 @@ classdef Gui < handle
         end
 
         function Demo(self)
-            for i = 1:length(self.kitchenRobot.plate_h)
-                self.kitchenRobot.MovePlate(i);
-            end
+                self.kitchenRobot.MoveAll;
         end
 
         function UpdateAllPositions(self)
